@@ -1,0 +1,12 @@
+env/
+images/
+__pycache__/
+downloads/
+history/
+data/
+
+*.log
+*.jpg
+*.json
+
+settings.py
