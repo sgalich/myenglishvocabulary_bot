@@ -155,28 +155,45 @@ def send_list(update, basket):
 
 def send_word(context, chat_id, basket):
 	basket_list = users[chat_id][basket]
-	if basket_list:
-		word = random.choice(basket_list)    # TODO: Show words w/ highest 'get' at first
-		word['shown'] += 1
-		utils.save_users(users)
-		reply_text = word['word']
-		if basket == 'unknown':
-			reply_text = get_definition(reply_text)
-		context.bot.send_message(
-			chat_id=chat_id,
-			text=reply_text,
-			reply_markup=utils.inline_keyboard(),
-		)
-	else:
+	if not basket_list:
 		context.bot.send_message(
 			chat_id=chat_id,
 			text=texts['nothing_to_show']
 		)
+		return None
+	# rearrange list so that words w/ get=2 multiplied by 2 and so on
+	weightened_basket_list = []
+	for word in basket_list:
+		for _ in range(word['get']):
+			weightened_basket_list.append(word)
+	word = random.choice(weightened_basket_list)
+	word['shown'] += 1
+	utils.save_users(users)
+	reply_text = word['word']
+
+
+	###############
+	# Temporary ###
+	if not word.get('def'):
+		word['def'] = get_definition(reply_text)
+		utils.save_users(users)
+	###############
+
+
+	# Append get & shown notation
+	get_count = word['get']
+	shown = word['shown']
+	reply_text = reply_text + '\n\n' + texts['get'].format(f'{get_count:,}') + ' ' + texts['shown'].format(f'{shown:,}')
+	context.bot.send_message(
+		chat_id=chat_id,
+		text=reply_text,
+		reply_markup=utils.inline_keyboard(),
+	)
 
 
 def get_definition(word):
 	f_word = word.split()[0]    # Leave only 1st word
-	definition = word
+	definition = ""
 	# 1. Phonetic transcription
 	phonetic_transcription = ipa.convert(f_word)
 	definition += f'\n[ {phonetic_transcription} ]'
@@ -196,7 +213,7 @@ def get_definition(word):
 		synonyms_str = f'\n\nSynonyms: {synonyms_str}'
 		definition += synonyms_str
 	# 4. Translation
-	translation = translator.translate(word, src='en', dest='ru').text    # TODO: Add different languages
+	translation = translator.translate(word, src='en', dest='ru').text    # TODO: Add different languages ???
 	if translation != word:
 		definition += f'\n\n{translation}'
 	return definition
@@ -250,13 +267,22 @@ def inline_callback(update, context):
 	callback = update.callback_query.data
 	word = update.callback_query.message.text
 	word = word.split('\n')[0]    # Extraction a word from definition
-	if callback == 'delete':
+	if callback == 'flip':
+		flip_word(context, chat_id, word)
+	elif callback == 'delete':
 		delete_word(context, chat_id, word)
 	elif callback == 'down':
 		downgrade_word(context, chat_id, word)
 	elif callback == 'up':
 		upgrade_word(context, chat_id, word)
+	elif callback == 'edit':
+		edit_word(context, chat_id, word)
 	update.callback_query.edit_message_text(text=update.callback_query.message.text)
+
+
+def flip_word(context, chat_id, word_to_delete):
+	pass
+
 
 
 def delete_word(context, chat_id, word_to_delete):
@@ -328,6 +354,10 @@ def upgrade_word(context, chat_id, word_to_upgrade):
 	if word_to_upgrade:
 		send_word(context, chat_id, 'known')    # Send a next word
 	utils.save_users(users)
+
+
+def edit_word(context, chat_id, card_to_edit):
+	pass
 
 
 def stop(update, context):
