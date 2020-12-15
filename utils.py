@@ -57,6 +57,26 @@ def save_users(users):
 		f.write(json.dumps(users, indent=4))
 
 
+def clear(word: str):
+	"""Method clear string from bad symbols like double spaces, tabs, '\n' and '\r'."""
+	try:
+		word = word.replace('\n', '').replace('\t', ' ').replace('\r', '') \
+			.replace('\xa0', '').replace('\uf0fc', '').replace('\'', '') \
+			.replace('&quot;', '\"').replace('&lt;', '<').replace('&gt;', '>') \
+			.replace('&ndash;', '–').replace('&mdash;', '—').replace('&rsquo;', '\"') \
+			.replace('&ldquo;', '“').replace('&rdquo;', '”').replace('&ensp;', ' ') \
+			.replace('&emsp;', ' ').replace('&thinsp;', ' ').replace('&zwnj;', ' ') \
+			.replace('&zwj;', ' ').replace('&lrm;', ' ').replace('&rlm;', ' ') \
+			.replace('&sbquo;', '\"').replace('&bdquo;', '\"').replace('&tilde;', '~') \
+			.replace('&circ;', '^').replace('&amp;', '&').replace('&lsaquo;', '‹') \
+			.replace('&rsaquo;', '›').replace('&permil;', '‰').replace('&euro;', '€') \
+			.strip().lower()
+		word = ' '.join(word.split())  # removes all double spaces
+	except AttributeError:
+		pass
+	return word
+
+
 def get_saved_info():
 
 	def get_users(file):

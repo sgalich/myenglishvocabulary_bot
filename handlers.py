@@ -17,15 +17,16 @@ users = {}
 #       chat_id: int,
 #       lang: en/ru/uk/...
 #       username: ''
-#       unknown: [
-#           {
-#               word: 'toddler',
-#               get: 2,    # how much did user send this word
-#               shown: 14    # how much did bot show this word to a user
-#           }, ...
-#       ],
-#       familiar: [...],
-#       known: [...]
+#       cards: {
+#           'toddler': {
+#               added: 2,    # how much did user send this word
+#               shown: 14,    # how much did bot show this word to a user
+#               basket: 'unknown'/'familiar'/'known',
+#               definition: '...'
+#           },
+#           'spite': {},
+#           ...
+#       }
 # }
 
 
@@ -87,9 +88,8 @@ def save_user(message):
 			chat_id=chat_id,
 			lang=message.from_user['language_code'],
 			username=message['chat']['username'],
-			unknown=[],
-			familiar=[],
-			known=[]
+			last_id=0,
+			vocabulary={}
 		)
 		utils.save_users(users)
 
@@ -114,6 +114,7 @@ def start(update, context):
 
 def message(update, context):
 	chat_id = update.message['chat']['id']
+	# Check is it a new user
 	try:
 		_ = users[chat_id]
 	except KeyError:
@@ -130,70 +131,80 @@ def message(update, context):
 	elif message_text == texts['b_all_unknown']:
 		send_list(update, 'unknown')
 	elif message_text == texts['b_known']:
-		send_word(context, chat_id, 'known')
+		choose_random_card(context, chat_id, 'known')
 	elif message_text == texts['b_familiar']:
-		send_word(context, chat_id, 'familiar')
+		choose_random_card(context, chat_id, 'familiar')
 	elif message_text == texts['b_unknown']:
-		send_word(context, chat_id, 'unknown')
+		choose_random_card(context, chat_id, 'unknown')
 	else:
 		for word in message_text.split('\n'):
-			save_word(update, word)
+			save_word(context, chat_id, word)
 		# add this word to unknown, remove this word from other baskets
 
 
-def send_list(update, basket):
-	chat_id = update.message['chat']['id']
-	basket_list = users[chat_id][basket]
-	basket_words = [x['word'] for x in basket_list]
+def send_list(update, basket_name: str):
+	user = users[update.message['chat']['id']]
+	basket_words = [word for word, card in user['cards'].items() if card['basket'] == basket_name]
 	basket_words = '\n'.join(sorted(basket_words))
-	basket_words += texts['total'].format(len(basket_list))
+	basket_size = len(basket_words)
+	basket_words += texts['total'].format(f'{basket_size:,}')
 	update.message.reply_text(
 		basket_words,
 		reply_markup=utils.my_keyboard()
 	)
 
 
-def send_word(context, chat_id, basket):
-	basket_list = users[chat_id][basket]
-	if not basket_list:
+def choose_random_card(context, chat_id, basket_name: str):
+	cards = users[chat_id]['cards']
+	# Create a list so that there would be 2 words w/ 'added'=2, 3 w/ 'added'=3 and so on
+	weightened_basket_list = []
+	for word, card in cards.items():
+		if card['basket'] != basket_name:
+			continue
+		for _ in range(card['added']):    # add as much the same cards as much a user was looking for this word
+			weightened_basket_list.append(word)
+	# If there is empty
+	if not weightened_basket_list:
 		context.bot.send_message(
 			chat_id=chat_id,
 			text=texts['nothing_to_show']
 		)
 		return None
-	# rearrange list so that words w/ get=2 multiplied by 2 and so on
-	weightened_basket_list = []
-	for word in basket_list:
-		for _ in range(word['get']):
-			weightened_basket_list.append(word)
-	word = random.choice(weightened_basket_list)
-	word['shown'] += 1
+	chosen_word = random.choice(weightened_basket_list)
+	cards[chosen_word]['shown'] += 1
 	utils.save_users(users)
-	reply_text = word['word']
+	send_card(context, chat_id, chosen_word)
 
+
+def send_card(context, chat_id, word):
+	card = users[chat_id]['cards'][word]
 
 	###############
 	# Temporary ###
-	if not word.get('def'):
-		word['def'] = get_definition(reply_text)
+	if not card.get('definition'):
+		card['definition'] = get_definition(word)
 		utils.save_users(users)
 	###############
 
 
-	# Append get & shown notation
-	get_count = word['get']
-	shown = word['shown']
-	reply_text = reply_text + '\n\n' + texts['get'].format(f'{get_count:,}') + ' ' + texts['shown'].format(f'{shown:,}')
 	context.bot.send_message(
 		chat_id=chat_id,
-		text=reply_text,
+		text=generate_word_side(word, card),
 		reply_markup=utils.inline_keyboard(),
 	)
 
 
+def generate_word_side(word, card):
+	# Append get & shown notation
+	added = card['added']
+	shown = card['shown']
+	reply_text = word + '\n\n' + texts['get'].format(f'{added:,}') + ' ' + texts['shown'].format(f'{shown:,}')
+	return reply_text
+
+
 def get_definition(word):
 	f_word = word.split()[0]    # Leave only 1st word
-	definition = ""
+	definition = f'{word}'
 	# 1. Phonetic transcription
 	phonetic_transcription = ipa.convert(f_word)
 	definition += f'\n[ {phonetic_transcription} ]'
@@ -219,140 +230,88 @@ def get_definition(word):
 	return definition
 
 
-def save_word(update, message_text):
-	message_text = message_text.strip().lower()
-	chat_id = update.message['chat']['id']
+def save_word(context, chat_id, new_word):
+	new_word = utils.clear(new_word)
 	user = users[chat_id]
-	new_word = None
-	# Try to find this word in baskets
-	for i in range(len(user['unknown'])):
-		word = user['unknown'][i]
-		if word['word'] == message_text:
-			new_word = word
-			new_word['get'] += 1
-			user['unknown'].pop(i)    # Remove this word from the basket
+	cards = user['cards']
+	new_card = None
+	for word in cards.keys():
+		if new_word == word:
+			new_card = cards[word]
+			new_card['added'] += 1
+			new_card['basket'] = 'unknown'    # Skip all the user's progress
 			break
-	if not new_word:
-		for i in range(len(user['familiar'])):
-			word = user['familiar'][i]
-			if word['word'] == message_text:
-				new_word = word
-				new_word['get'] += 1
-				user['familiar'].pop(i)  # Remove this word from the basket
-				break
-	if not new_word:
-		for i in range(len(user['known'])):
-			word = user['known'][i]
-			if word['word'] == message_text:
-				new_word = word
-				new_word['get'] += 1
-				user['known'].pop(i)  # Remove this word from the basket
-				break
-	if not new_word:
-		new_word = dict(
-			word=message_text,
-			get=1,
-			shown=0
+	if not new_card:
+		new_card = dict(
+			added=1,
+			shown=0,
+			basket='unknown',
+			definition=get_definition(new_word)
 		)
-	users[chat_id]['unknown'].append(new_word)
+		cards[new_word] = new_card
 	utils.save_users(users)
-	update.message.reply_text(
-		get_definition(message_text),
-		reply_markup=utils.my_keyboard()
-	)
+	send_card(context, chat_id, new_word)    # TODO: Send flipped side of the card right here
 
 
 def inline_callback(update, context):
 	chat_id = update.callback_query.from_user.id
 	callback = update.callback_query.data
-	word = update.callback_query.message.text
-	word = word.split('\n')[0]    # Extraction a word from definition
+	message_text = update.callback_query.message.text
+	word = message_text.split('\n')[0]    # Extraction a word from definition ????????
 	if callback == 'flip':
-		flip_word(context, chat_id, word)
+		flip_card(update, chat_id, message_text)
 	elif callback == 'delete':
-		delete_word(context, chat_id, word)
+		delete_word(update, chat_id, word)
 	elif callback == 'down':
 		downgrade_word(context, chat_id, word)
 	elif callback == 'up':
 		upgrade_word(context, chat_id, word)
 	elif callback == 'edit':
 		edit_word(context, chat_id, word)
-	update.callback_query.edit_message_text(text=update.callback_query.message.text)
+		update.callback_query.edit_message_text(text=update.callback_query.message.text)    # TODO: differentiate for each callback
 
 
-def flip_word(context, chat_id, word_to_delete):
-	pass
+def flip_card(update, chat_id, message_text):
+	word = message_text.split('\n')[0]  # Extraction a word from definition ????????
+	second_line = message_text.split('\n')[1]
+	side = 'card' if second_line and second_line[0] == '[' else 'word'
+	if side == 'card':
+		text = generate_word_side(word, users[chat_id]['cards'][word])
+	else:
+		text = users[chat_id]['cards'][word]['definition']
+	update.callback_query.edit_message_text(
+		text=text,
+		reply_markup=utils.inline_keyboard(),
+	)
 
 
+def delete_word(update, chat_id, word):
+	# TODO: try to delete flipped card is word = word and not a definition
+	cards = users[chat_id]['cards']
+	del cards[word]
+	utils.save_users(users)
+	update.callback_query.message.delete()
 
-def delete_word(context, chat_id, word_to_delete):
+
+def downgrade_word(context, chat_id, word):
 	user = users[chat_id]
-	# Try to find this word in baskets
-	for i in range(len(user['unknown'])):
-		if user['unknown'][i]['word'] == word_to_delete:
-			user['unknown'].pop(i)    # Remove this word from the basket
-			send_word(context, chat_id, 'unknown')    # Send a next word
-			word_to_delete = None
-			break
-	if word_to_delete:
-		for i in range(len(user['familiar'])):
-			if user['familiar'][i]['word'] == word_to_delete:
-				user['familiar'].pop(i)    # Remove this word from the basket
-				send_word(context, chat_id, 'familiar')    # Send a next word
-				word_to_delete = None
-				break
-	if word_to_delete:
-		for i in range(len(user['known'])):
-			if user['known'][i]['word'] == word_to_delete:
-				user['known'].pop(i)  # Remove this word from the basket
-				send_word(context, chat_id, 'known')    # Send a next word
-				break
+	card = user['cards'][word]
+	if card['basket'] == 'known':
+		card['basket'] = 'familiar'
+	elif card['basket'] == 'familiar':
+		card['basket'] = 'unknown'
+	# choose_random_card(context, chat_id, 'unknown')  # Send a next word
 	utils.save_users(users)
 
 
-def downgrade_word(context, chat_id, word_to_downgrade):
+def upgrade_word(context, chat_id, word):
 	user = users[chat_id]
-	# Try to find this word in baskets
-	for i in range(len(user['known'])):
-		if user['known'][i]['word'] == word_to_downgrade:
-			word = user['known'].pop(i)  # Remove this word from the basket
-			user['familiar'].append(word)
-			send_word(context, chat_id, 'known')    # Send a next word
-			word_to_downgrade = None
-			break
-	if word_to_downgrade:
-		for i in range(len(user['familiar'])):
-			if user['familiar'][i]['word'] == word_to_downgrade:
-				word = user['familiar'].pop(i)  # Remove this word from the basket
-				user['unknown'].append(word)
-				send_word(context, chat_id, 'familiar')    # Send a next word
-				word_to_downgrade = None
-				break
-	if word_to_downgrade:
-		send_word(context, chat_id, 'unknown')    # Send a next word
-	utils.save_users(users)
-
-
-def upgrade_word(context, chat_id, word_to_upgrade):
-	user = users[chat_id]
-	# Try to find this word in baskets
-	for i in range(len(user['unknown'])):
-		if user['unknown'][i]['word'] == word_to_upgrade:
-			word = user['unknown'].pop(i)    # Remove this word from the basket
-			user['familiar'].append(word)
-			send_word(context, chat_id, 'unknown')    # Send a next word
-			word_to_upgrade = None
-			break
-	if word_to_upgrade:
-		for i in range(len(user['familiar'])):
-			if user['familiar'][i]['word'] == word_to_upgrade:
-				word = user['familiar'].pop(i)  # Remove this word from the basket
-				user['known'].append(word)
-				send_word(context, chat_id, 'familiar')    # Send a next word
-				word_to_upgrade = None
-				break
-	if word_to_upgrade:
-		send_word(context, chat_id, 'known')    # Send a next word
+	card = user['cards'][word]
+	if card['basket'] == 'unknown':
+		card['basket'] = 'familiar'
+	elif card['basket'] == 'familiar':
+		card['basket'] = 'known'
+	# choose_random_card(context, chat_id, 'unknown')  # Send a next word
 	utils.save_users(users)
 
 

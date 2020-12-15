@@ -4,6 +4,7 @@ __pycache__/
 downloads/
 history/
 data/
+.idea/
 
 *.log
 *.jpg
