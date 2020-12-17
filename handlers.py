@@ -1,12 +1,15 @@
 import random
 
+import numpy
 from PyDictionary import PyDictionary
-import eng_to_ipa as ipa
+import eng_to_ipa
 from googletrans import Translator
 from googletrans.models import Translated
+
 from texts import texts
 import utils
 
+# TODO: Send cards every day if I didn't use it
 
 dictionary = PyDictionary()
 translator = Translator()
@@ -88,8 +91,7 @@ def save_user(message):
 			chat_id=chat_id,
 			lang=message.from_user['language_code'],
 			username=message['chat']['username'],
-			last_id=0,
-			vocabulary={}
+			cards={}
 		)
 		utils.save_users(users)
 
@@ -130,12 +132,8 @@ def message(update, context):
 		send_list(update, 'familiar')
 	elif message_text == texts['b_all_unknown']:
 		send_list(update, 'unknown')
-	elif message_text == texts['b_known']:
-		choose_random_card(context, chat_id, 'known')
-	elif message_text == texts['b_familiar']:
-		choose_random_card(context, chat_id, 'familiar')
-	elif message_text == texts['b_unknown']:
-		choose_random_card(context, chat_id, 'unknown')
+	elif message_text == texts['b_next']:
+		choose_random_card(context, chat_id)
 	else:
 		for word in message_text.split('\n'):
 			save_word(context, chat_id, word)
@@ -154,80 +152,111 @@ def send_list(update, basket_name: str):
 	)
 
 
-def choose_random_card(context, chat_id, basket_name: str):
+def choose_random_card(context, chat_id):
+	"""Chooses a word with these rules:
+	as much ADDED as MORE chance
+	as much DOWN pressed as MORE chance
+	as much SHOWN as LESS chance
+	as much UP pressed as LESS chance
+	"""
 	cards = users[chat_id]['cards']
-	# Create a list so that there would be 2 words w/ 'added'=2, 3 w/ 'added'=3 and so on
-	weightened_basket_list = []
+	words_list = []
+	probabilities = []
 	for word, card in cards.items():
-		if card['basket'] != basket_name:
-			continue
-		for _ in range(card['added']):    # add as much the same cards as much a user was looking for this word
-			weightened_basket_list.append(word)
-	# If there is empty
-	if not weightened_basket_list:
-		context.bot.send_message(
-			chat_id=chat_id,
-			text=texts['nothing_to_show']
-		)
-		return None
-	chosen_word = random.choice(weightened_basket_list)
+		words_list.append(word)
+		weight = (card['added'] + 1) * (card['down'] + 1) / (card['shown'] + 1) / (card['up'] + 1)
+		probabilities.append(weight)
+	probabilities_sum = sum(probabilities)
+	probabilities = [x / probabilities_sum for x in probabilities]
+	chosen_word = numpy.random.choice(words_list, p=probabilities)
 	cards[chosen_word]['shown'] += 1
 	utils.save_users(users)
 	send_card(context, chat_id, chosen_word)
 
 
-def send_card(context, chat_id, word):
-	card = users[chat_id]['cards'][word]
 
+def DEPRECATED_SEARCH(word, card):
 	###############
 	# Temporary ###
 	if not card.get('definition'):
 		card['definition'] = get_definition(word)
-		utils.save_users(users)
-	###############
+	if not card.get('pronunciation'):
+		card['pronunciation'] = get_pronunciation(word)
+	if not card.get('synonyms'):
+		card['synonyms'] = get_synonyms(word)
+	if not card.get('translation'):
+		card['translation'] = get_translation(word)
+	utils.save_users(users)
 
 
+
+def send_card(context, chat_id, word):
+	card = users[chat_id]['cards'][word]
+	DEPRECATED_SEARCH(word, card)
 	context.bot.send_message(
 		chat_id=chat_id,
-		text=generate_word_side(word, card),
+		text=generate_front_side(word, card),
 		reply_markup=utils.inline_keyboard(),
 	)
 
 
-def generate_word_side(word, card):
+def generate_front_side(word, card):
 	# Append get & shown notation
 	added = card['added']
+	added = f'{added:,}'
 	shown = card['shown']
-	reply_text = word + '\n\n' + texts['get'].format(f'{added:,}') + ' ' + texts['shown'].format(f'{shown:,}')
-	return reply_text
+	shown = f'{shown:,}'
+	pronunciation = card['pronunciation']
+	front_side = f"""{word}
+[ {pronunciation} ]
+
+📥 {added} 👁️ {shown}
+"""
+	return front_side
+
+
+def generate_back_side(word, card):
+	definition = card['definition']
+	synonyms = card['synonyms']
+	translation = card['translation']
+	back_side = f"""{definition}
+
+📖 {word}: {synonyms}
+
+🗣️ {translation}
+"""
+	return back_side
 
 
 def get_definition(word):
-	f_word = word.split()[0]    # Leave only 1st word
-	definition = f'{word}'
-	# 1. Phonetic transcription
-	phonetic_transcription = ipa.convert(f_word)
-	definition += f'\n[ {phonetic_transcription} ]'
-	# 2. Meaning
-	meaning = dictionary.meaning(f_word)
+	"""Get definition of the word."""
+	first_word = word.split()[0]    # Leave only 1st word
+	meaning = dictionary.meaning(first_word)
+	definition = ""
 	if meaning:
-		meaning_str = ""
 		for part_of_speech, def_list in meaning.items():
-			meaning_str += f'\n\n{part_of_speech}'
+			definition += f'\n\n{part_of_speech}'
 			for dfntn in def_list:
-				meaning_str += f'\n\t– {dfntn}'
-		definition += meaning_str
-	# 3. Synonyms
-	synonyms = dictionary.synonym(f_word)
-	if synonyms:
-		synonyms_str = ', '.join(synonyms)
-		synonyms_str = f'\n\nSynonyms: {synonyms_str}'
-		definition += synonyms_str
-	# 4. Translation
-	translation = translator.translate(word, src='en', dest='ru').text    # TODO: Add different languages ???
-	if translation != word:
-		definition += f'\n\n{translation}'
+				definition += f'\n\t– {dfntn}'
 	return definition
+
+
+def get_pronunciation(word):
+	pronunciation = eng_to_ipa.convert(''.join(word))
+	return pronunciation
+
+
+def get_synonyms(word):
+	first_word = word.split()[0]  # Leave only 1st word
+	synonyms = dictionary.synonym(first_word)
+	synonyms = ', '.join(synonyms) if synonyms else ''
+	return synonyms
+
+
+def get_translation(word):
+	translation = translator.translate(word, src='en', dest='ru').text    # TODO: Add different languages ???
+	translation = translation if translation != word else ''
+	return translation
 
 
 def save_word(context, chat_id, new_word):
@@ -239,18 +268,31 @@ def save_word(context, chat_id, new_word):
 		if new_word == word:
 			new_card = cards[word]
 			new_card['added'] += 1
-			new_card['basket'] = 'unknown'    # Skip all the user's progress
 			break
 	if not new_card:
 		new_card = dict(
 			added=1,
 			shown=0,
-			basket='unknown',
-			definition=get_definition(new_word)
+			up=0,
+			down=0,
+			definition=get_definition(new_word),
+			pronunciation=get_pronunciation(new_word),
+			synonyms=get_synonyms(new_word),
+			translation=get_translation(new_word)
 		)
 		cards[new_word] = new_card
+	DEPRECATED_SEARCH(new_word, new_card)
 	utils.save_users(users)
-	send_card(context, chat_id, new_word)    # TODO: Send flipped side of the card right here
+	context.bot.send_message(
+		chat_id=chat_id,
+		text=new_card['pronunciation'],
+		reply_markup=utils.my_keyboard(),
+	)
+	context.bot.send_message(
+		chat_id=chat_id,
+		text=generate_back_side(new_word, new_card),
+		reply_markup=utils.inline_keyboard(),
+	)
 
 
 def inline_callback(update, context):
@@ -272,16 +314,17 @@ def inline_callback(update, context):
 
 
 def flip_card(update, chat_id, message_text):
-	word = message_text.split('\n')[0]  # Extraction a word from definition ????????
-	second_line = message_text.split('\n')[1]
-	side = 'card' if second_line and second_line[0] == '[' else 'word'
-	if side == 'card':
-		text = generate_word_side(word, users[chat_id]['cards'][word])
+	if '👁️' in message_text:
+		word = message_text.split('\n')[0]  # Extraction a word from definition ????????
+		card = users[chat_id]['cards'][word]
+		text = generate_back_side(word, card)
 	else:
-		text = users[chat_id]['cards'][word]['definition']
+		word = message_text.split('📖 ')[1].split(': ')[0]
+		card = users[chat_id]['cards'][word]
+		text = generate_front_side(word, card)
 	update.callback_query.edit_message_text(
 		text=text,
-		reply_markup=utils.inline_keyboard(),
+		reply_markup=utils.inline_keyboard()
 	)
 
 
@@ -294,24 +337,12 @@ def delete_word(update, chat_id, word):
 
 
 def downgrade_word(context, chat_id, word):
-	user = users[chat_id]
-	card = user['cards'][word]
-	if card['basket'] == 'known':
-		card['basket'] = 'familiar'
-	elif card['basket'] == 'familiar':
-		card['basket'] = 'unknown'
-	# choose_random_card(context, chat_id, 'unknown')  # Send a next word
+	users[chat_id]['cards'][word]['down'] += 1
 	utils.save_users(users)
 
 
 def upgrade_word(context, chat_id, word):
-	user = users[chat_id]
-	card = user['cards'][word]
-	if card['basket'] == 'unknown':
-		card['basket'] = 'familiar'
-	elif card['basket'] == 'familiar':
-		card['basket'] = 'known'
-	# choose_random_card(context, chat_id, 'unknown')  # Send a next word
+	users[chat_id]['cards'][word]['up'] += 1
 	utils.save_users(users)
 
 

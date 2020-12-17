@@ -19,14 +19,7 @@ def my_keyboard():
 	keyboard = ReplyKeyboardMarkup(
 		[
 			[
-				KeyboardButton(texts['b_all_known']),
-				KeyboardButton(texts['b_all_familiar']),
-				KeyboardButton(texts['b_all_unknown'])
-			],
-			[
-				KeyboardButton(texts['b_known']),
-				KeyboardButton(texts['b_familiar']),
-				KeyboardButton(texts['b_unknown'])
+				KeyboardButton(texts['b_next'])
 			]
 		],
 		resize_keyboard=True
