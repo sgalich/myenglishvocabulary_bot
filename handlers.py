@@ -126,14 +126,8 @@ def message(update, context):
 
 	utils.log(f'MESSAGE from: {chat_id}, text: {message_text}')
 
-	if message_text == texts['b_all_known']:
-		send_list(update, 'known')
-	elif message_text == texts['b_all_familiar']:
-		send_list(update, 'familiar')
-	elif message_text == texts['b_all_unknown']:
-		send_list(update, 'unknown')
-	elif message_text == texts['b_next']:
-		choose_random_card(context, chat_id)
+	if message_text == texts['b_next']:
+		send_random_card(context, chat_id)
 	else:
 		for word in message_text.split('\n'):
 			save_word(context, chat_id, word)
@@ -152,13 +146,23 @@ def send_list(update, basket_name: str):
 	)
 
 
-def choose_random_card(context, chat_id):
+def send_random_card(context, chat_id):
 	"""Chooses a word with these rules:
 	as much ADDED as MORE chance
 	as much DOWN pressed as MORE chance
 	as much SHOWN as LESS chance
 	as much UP pressed as LESS chance
 	"""
+
+	def send_card(context, chat_id, word):
+		card = users[chat_id]['cards'][word]
+		DEPRECATED_SEARCH(word, card)
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=generate_front_side(word, card),
+			reply_markup=utils.inline_keyboard(),
+		)
+
 	cards = users[chat_id]['cards']
 	words_list = []
 	probabilities = []
@@ -190,14 +194,7 @@ def DEPRECATED_SEARCH(word, card):
 
 
 
-def send_card(context, chat_id, word):
-	card = users[chat_id]['cards'][word]
-	DEPRECATED_SEARCH(word, card)
-	context.bot.send_message(
-		chat_id=chat_id,
-		text=generate_front_side(word, card),
-		reply_markup=utils.inline_keyboard(),
-	)
+
 
 
 def generate_front_side(word, card):
@@ -299,54 +296,69 @@ def inline_callback(update, context):
 	chat_id = update.callback_query.from_user.id
 	callback = update.callback_query.data
 	message_text = update.callback_query.message.text
-	word = message_text.split('\n')[0]    # Extraction a word from definition ????????
 	if callback == 'flip':
 		flip_card(update, chat_id, message_text)
-	elif callback == 'delete':
-		delete_word(update, chat_id, word)
-	elif callback == 'down':
-		downgrade_word(context, chat_id, word)
-	elif callback == 'up':
-		upgrade_word(context, chat_id, word)
-	elif callback == 'edit':
-		edit_word(context, chat_id, word)
-		update.callback_query.edit_message_text(text=update.callback_query.message.text)    # TODO: differentiate for each callback
+	else:
+		if callback == 'delete':
+			delete_word(context, update, chat_id, message_text)
+		elif callback == 'down':
+			downgrade_word(context, chat_id, message_text)
+		elif callback == 'up':
+			upgrade_word(context, chat_id, message_text)
+		elif callback == 'edit':
+			edit_word(context, chat_id, message_text)
+		update.callback_query.edit_message_text(
+			text=update.callback_query.message.text,
+			reply_markup=utils.inline_keyboard(mini=True)
+		)
+
+
+def find_the_word(message_text):
+	if '👁️' in message_text:
+		word = message_text.split('\n')[0]
+	else:
+		word = message_text.split('📖 ')[1].split(': ')[0]
+	return word
 
 
 def flip_card(update, chat_id, message_text):
+	word = find_the_word(message_text)
+	card = users[chat_id]['cards'][word]
 	if '👁️' in message_text:
-		word = message_text.split('\n')[0]  # Extraction a word from definition ????????
-		card = users[chat_id]['cards'][word]
 		text = generate_back_side(word, card)
 	else:
-		word = message_text.split('📖 ')[1].split(': ')[0]
-		card = users[chat_id]['cards'][word]
 		text = generate_front_side(word, card)
 	update.callback_query.edit_message_text(
 		text=text,
-		reply_markup=utils.inline_keyboard()
+		reply_markup=utils.inline_keyboard()    # TODO: Check and save this inline (mini if it was mini)
 	)
 
 
-def delete_word(update, chat_id, word):
-	# TODO: try to delete flipped card is word = word and not a definition
+def delete_word(context, update, chat_id, message_text):
+	word = find_the_word(message_text)
 	cards = users[chat_id]['cards']
 	del cards[word]
 	utils.save_users(users)
 	update.callback_query.message.delete()
+	send_random_card(context, chat_id)
 
 
-def downgrade_word(context, chat_id, word):
+def downgrade_word(context, chat_id, message_text):
+	word = find_the_word(message_text)
 	users[chat_id]['cards'][word]['down'] += 1
 	utils.save_users(users)
+	send_random_card(context, chat_id)
 
 
-def upgrade_word(context, chat_id, word):
+def upgrade_word(context, chat_id, message_text):
+	word = find_the_word(message_text)
 	users[chat_id]['cards'][word]['up'] += 1
 	utils.save_users(users)
+	send_random_card(context, chat_id)
 
 
-def edit_word(context, chat_id, card_to_edit):
+# TODO: Create this function
+def edit_word(context, chat_id, message_text):
 	pass
 
 

@@ -27,12 +27,15 @@ def my_keyboard():
 	return keyboard
 
 
-def inline_keyboard():
-	keyboard = InlineKeyboardMarkup(
+def inline_keyboard(mini=False):
+	if mini:
+		return InlineKeyboardMarkup(
+			[[InlineKeyboardButton(text=texts['b_flip'], callback_data='flip')]],
+			resize_keyboard=True
+		)
+	return InlineKeyboardMarkup(
 		[
-			[
-				InlineKeyboardButton(text=texts['b_flip'], callback_data='flip')
-			],
+			[InlineKeyboardButton(text=texts['b_flip'], callback_data='flip')],
 			[
 				InlineKeyboardButton(text=texts['b_remove'], callback_data='delete'),
 				InlineKeyboardButton(text=texts['b_down'], callback_data='down'),
@@ -42,7 +45,6 @@ def inline_keyboard():
 		],
 		resize_keyboard=True
 	)
-	return keyboard
 
 
 def save_users(users):
