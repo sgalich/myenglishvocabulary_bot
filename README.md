@@ -9,5 +9,5 @@ Then you can list your cards in random order
 
 Commands:
 ---------
-/start - start bot
-/stop - stop bot
+- /start - start bot
+- /stop - stop bot
