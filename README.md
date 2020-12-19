@@ -1,4 +1,4 @@
-Telegram bot @myenglishvocabulary_bot
+Telegram bot "My English Vocabulary"
 =====================================
 
 This is [Telegram bot](https://t.me/myenglishvocabulary_bot) for learning English words by using convenient cards.
