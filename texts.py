@@ -1,6 +1,6 @@
 texts = dict(
 	# Bot's answers
-	start="""Hi! I\'m a simple card-using bot for learning English words.
+	start="""Hi! I\'m a simple card-using bot for learning English words, created by @abx05.
 
 Just write me a word you want to add and I\'ll add it in your vocabulary with default suggestions.
 
@@ -9,6 +9,8 @@ Here my commands:
 👎 - show a card more often
 👍 - show a card less often
 ✍ - edit a card
+
+
 
 Good luck! 🤖""",
 	help="""I have these commands:

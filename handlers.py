@@ -280,9 +280,10 @@ def save_word(context, chat_id, new_word):
 		cards[new_word] = new_card
 	DEPRECATED_SEARCH(new_word, new_card)
 	utils.save_users(users)
+	pronunciation = new_card['pronunciation']
 	context.bot.send_message(
 		chat_id=chat_id,
-		text=new_card['pronunciation'],
+		text=f'[ {pronunciation} ]',
 		reply_markup=utils.my_keyboard(),
 	)
 	context.bot.send_message(

@@ -40,7 +40,7 @@ def inline_keyboard(mini=False):
 				InlineKeyboardButton(text=texts['b_remove'], callback_data='delete'),
 				InlineKeyboardButton(text=texts['b_down'], callback_data='down'),
 				InlineKeyboardButton(text=texts['b_up'], callback_data='up'),
-				InlineKeyboardButton(text=texts['b_edit'], callback_data='edit')
+				# InlineKeyboardButton(text=texts['b_edit'], callback_data='edit')
 			]
 		],
 		resize_keyboard=True
