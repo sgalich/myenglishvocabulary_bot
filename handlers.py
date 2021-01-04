@@ -14,73 +14,6 @@ import utils
 dictionary = PyDictionary()
 translator = Translator()
 users = {}
-# user:
-# {
-# 	chat_id (int): {
-#       chat_id: int,
-#       lang: en/ru/uk/...
-#       username: ''
-#       cards: {
-#           'toddler': {
-#               added: 2,    # how much did user send this word
-#               shown: 14,    # how much did bot show this word to a user
-#               basket: 'unknown'/'familiar'/'known',
-#               definition: '...'
-#           },
-#           'spite': {},
-#           ...
-#       }
-# }
-
-
-# UTILS
-
-# def send_stats(update):
-# 	m_m = 0
-# 	m_b = 0
-# 	m_f = 0
-# 	f_m = 0
-# 	f_b = 0
-# 	f_f = 0
-# 	for _, user in users.items():
-# 		if 'real' in update.message['text'] and 'test' in str(user['chat_id']):
-# 			continue
-# 		if user['profile']['sex_my'] == 'male':
-# 			if user['profile']['sex_req'] == 'male':
-# 				m_m += 1
-# 			elif user['profile']['sex_req'] == 'both':
-# 				m_b += 1
-# 			elif user['profile']['sex_req'] == 'female':
-# 				m_f += 1
-# 		elif user['profile']['sex_my'] == 'female':
-# 			if user['profile']['sex_req'] == 'male':
-# 				f_m += 1
-# 			elif user['profile']['sex_req'] == 'both':
-# 				f_b += 1
-# 			elif user['profile']['sex_req'] == 'female':
-# 				f_f += 1
-# 	males_count = m_f + m_m + m_b
-# 	females_count = f_m + f_f + f_b
-# 	males_percentage = '{:.1f}'.format(males_count / (males_count + females_count) * 100)
-# 	females_percentage = '{:.1f}'.format(females_count / (males_count + females_count) * 100)
-# 	stats_mes = f"""
-# Males: {males_count} ({males_percentage}%)
-# \t\t\tlooking for
-# \t\t\twomen: {m_f}
-# \t\t\tmen: {m_m}
-# \t\t\tboth: {m_b}
-#
-# Females: {females_count} ({females_percentage}%)
-# \t\t\tlooking for
-# \t\t\tmen: {f_m}
-# \t\t\twomen: {f_f}
-# \t\t\tboth: {f_b}
-#
-# Users total: {males_count + females_count}
-# """
-# 	update.message.reply_text(stats_mes, parse_mode='Markdown')
-
-
 
 
 def save_user(message):
@@ -91,6 +24,7 @@ def save_user(message):
 			chat_id=chat_id,
 			lang=message.from_user['language_code'],
 			username=message['chat']['username'],
+			edit=None,
 			cards={}
 		)
 		utils.save_users(users)
@@ -124,32 +58,22 @@ def message(update, context):
 		return None
 	message_text = update.message['text']
 
-	utils.log(f'MESSAGE from: {chat_id}, text: {message_text}')
+	utils.log(f'>>> {chat_id}: {message_text}')
 
-	if message_text == texts['b_next']:
+	if users[chat_id].get('edit'):
+		continue_edit_card(update, context, chat_id)
+	elif message_text == texts['b_next']:
 		send_random_card(context, chat_id)
 	else:
 		for word in message_text.split('\n'):
 			save_word(context, chat_id, word)
-		# add this word to unknown, remove this word from other baskets
-
-
-def send_list(update, basket_name: str):
-	user = users[update.message['chat']['id']]
-	basket_words = [word for word, card in user['cards'].items() if card['basket'] == basket_name]
-	basket_words = '\n'.join(sorted(basket_words))
-	basket_size = len(basket_words)
-	basket_words += texts['total'].format(f'{basket_size:,}')
-	update.message.reply_text(
-		basket_words,
-		reply_markup=utils.my_keyboard()
-	)
 
 
 def send_random_card(context, chat_id):
 	"""Chooses a word with these rules:
 	as much ADDED as MORE chance
 	as much DOWN pressed as MORE chance
+	as much FLIPPED as MORE chance
 	as much SHOWN as LESS chance
 	as much UP pressed as LESS chance
 	"""
@@ -168,7 +92,8 @@ def send_random_card(context, chat_id):
 	probabilities = []
 	for word, card in cards.items():
 		words_list.append(word)
-		weight = (card['added'] + 1) * (card['down'] + 1) / (card['shown'] + 1) / (card['up'] + 1)
+		# weight = (card['added'] + 1) * (card['down'] + 1) * (card['flipped'] + 1) / (card['shown'] + 1) / (card['up'] + 1)
+		weight = (card['added'] + 1) * (card['flipped'] + 1) / (card['shown'] + 1) / (card['up'] + 1)
 		probabilities.append(weight)
 	probabilities_sum = sum(probabilities)
 	probabilities = [x / probabilities_sum for x in probabilities]
@@ -191,10 +116,6 @@ def DEPRECATED_SEARCH(word, card):
 	if not card.get('translation'):
 		card['translation'] = get_translation(word)
 	utils.save_users(users)
-
-
-
-
 
 
 def generate_front_side(word, card):
@@ -271,7 +192,8 @@ def save_word(context, chat_id, new_word):
 			added=1,
 			shown=0,
 			up=0,
-			down=0,
+			# down=0,
+			flipped=0,
 			definition=get_definition(new_word),
 			pronunciation=get_pronunciation(new_word),
 			synonyms=get_synonyms(new_word),
@@ -302,16 +224,22 @@ def inline_callback(update, context):
 	else:
 		if callback == 'delete':
 			delete_word(context, update, chat_id, message_text)
-		elif callback == 'down':
-			downgrade_word(context, chat_id, message_text)
+		# elif callback == 'down':
+		# 	downgrade_word(context, chat_id, message_text)
 		elif callback == 'up':
 			upgrade_word(context, chat_id, message_text)
+			# Hide delete/up/edit buttons
+			update.callback_query.edit_message_text(
+				text=update.callback_query.message.text,
+				reply_markup=utils.inline_keyboard(mini=True)
+			)
 		elif callback == 'edit':
-			edit_word(context, chat_id, message_text)
-		update.callback_query.edit_message_text(
-			text=update.callback_query.message.text,
-			reply_markup=utils.inline_keyboard(mini=True)
-		)
+			start_edit_card(context, chat_id, message_text)
+			# Hide delete/up/edit buttons
+			update.callback_query.edit_message_text(
+				text=update.callback_query.message.text,
+				reply_markup=utils.inline_keyboard(mini=True)
+			)
 
 
 def find_the_word(message_text):
@@ -327,6 +255,7 @@ def flip_card(update, chat_id, message_text):
 	card = users[chat_id]['cards'][word]
 	if '👁️' in message_text:
 		text = generate_back_side(word, card)
+		card['flipped'] += 1
 	else:
 		text = generate_front_side(word, card)
 	update.callback_query.edit_message_text(
@@ -344,11 +273,11 @@ def delete_word(context, update, chat_id, message_text):
 	send_random_card(context, chat_id)
 
 
-def downgrade_word(context, chat_id, message_text):
-	word = find_the_word(message_text)
-	users[chat_id]['cards'][word]['down'] += 1
-	utils.save_users(users)
-	send_random_card(context, chat_id)
+# def downgrade_word(context, chat_id, message_text):
+# 	word = find_the_word(message_text)
+# 	users[chat_id]['cards'][word]['down'] += 1
+# 	utils.save_users(users)
+# 	send_random_card(context, chat_id)
 
 
 def upgrade_word(context, chat_id, message_text):
@@ -358,9 +287,82 @@ def upgrade_word(context, chat_id, message_text):
 	send_random_card(context, chat_id)
 
 
-# TODO: Create this function
-def edit_word(context, chat_id, message_text):
-	pass
+def start_edit_card(context, chat_id, message_text):
+	word = find_the_word(message_text)
+	users[chat_id]['edit'] = {
+		'word': word,
+		'status': 'pronunciation'
+	}
+	context.bot.send_message(
+		chat_id=chat_id,
+		text=texts['edit_pronunciation']
+	)
+	pronunciation = users[chat_id]['cards'][word]['pronunciation']
+	context.bot.send_message(
+		chat_id=chat_id,
+		text=pronunciation,
+		reply_markup=utils.my_keyboard(text=pronunciation),
+	)
+
+# TODO: Remake it with inline keyboard
+#  (choose what to edit after edit button is pressed and edit only one thing per try)
+def continue_edit_card(update, context, chat_id):
+	word = users[chat_id]['edit']['word']
+	status = users[chat_id]['edit']['status']
+	message_text = update.message['text']
+	if status == 'pronunciation':
+		users[chat_id]['cards'][word]['pronunciation'] = message_text
+		users[chat_id]['edit']['status'] = 'definition'
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=texts['edit_definition']
+		)
+		definition = users[chat_id]['cards'][word]['definition']
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=definition,
+			reply_markup=utils.my_keyboard(text=definition),
+		)
+	elif status == 'definition':
+		users[chat_id]['cards'][word]['definition'] = message_text
+		users[chat_id]['edit']['status'] = 'synonyms'
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=texts['edit_synonyms']
+		)
+		synonyms = users[chat_id]['cards'][word]['synonyms']
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=synonyms,
+			reply_markup=utils.my_keyboard(text=synonyms),
+		)
+	elif status == 'synonyms':
+		users[chat_id]['cards'][word]['synonyms'] = message_text
+		users[chat_id]['edit']['status'] = 'translation'
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=texts['edit_translation']
+		)
+		translation = users[chat_id]['cards'][word]['translation']
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=translation,
+			reply_markup=utils.my_keyboard(text=translation),
+		)
+	elif status == 'translation':
+		users[chat_id]['cards'][word]['synonyms'] = message_text
+		users[chat_id]['edit'] = None
+		utils.save_users(users)
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=texts['edit_finished'],
+			reply_markup=utils.my_keyboard(),
+		)
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=generate_back_side(word, users[chat_id]['cards'][word]),
+			reply_markup=utils.inline_keyboard(),
+		)
 
 
 def stop(update, context):

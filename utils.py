@@ -15,11 +15,11 @@ USERS_FILE = os.path.join('.', 'data', 'users.json')
 # KEYBOARDS
 ##################
 
-def my_keyboard():
+def my_keyboard(text=texts['b_next']):
 	keyboard = ReplyKeyboardMarkup(
 		[
 			[
-				KeyboardButton(texts['b_next'])
+				KeyboardButton(text)
 			]
 		],
 		resize_keyboard=True
@@ -38,9 +38,9 @@ def inline_keyboard(mini=False):
 			[InlineKeyboardButton(text=texts['b_flip'], callback_data='flip')],
 			[
 				InlineKeyboardButton(text=texts['b_remove'], callback_data='delete'),
-				InlineKeyboardButton(text=texts['b_down'], callback_data='down'),
+				# InlineKeyboardButton(text=texts['b_down'], callback_data='down'),
+				InlineKeyboardButton(text=texts['b_edit'], callback_data='edit'),
 				InlineKeyboardButton(text=texts['b_up'], callback_data='up'),
-				# InlineKeyboardButton(text=texts['b_edit'], callback_data='edit')
 			]
 		],
 		resize_keyboard=True
