@@ -6,7 +6,6 @@ Just write me a word you want to add and I\'ll add it in your vocabulary with de
 
 Here my commands:
 🚫 - delete a card
-👎 - show a card more often
 👍 - show a card less often
 ✍ - edit a card
 
@@ -22,7 +21,6 @@ Good luck! 🤖""",
 	b_next='🎲 next random card ▶️',
 	b_flip='↪️          FLIP OVER          ↩️',
 	b_remove='🚫',
-	b_down='👎',
 	b_up='👍',
 	b_edit='✍️',
 	edit_pronunciation='Send a new pronunciation or leave this one:',

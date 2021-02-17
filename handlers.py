@@ -1,15 +1,14 @@
-import random
-
 import numpy
 from PyDictionary import PyDictionary
 import eng_to_ipa
 from googletrans import Translator
-from googletrans.models import Translated
 
 from texts import texts
 import utils
 
+
 # TODO: Send cards every day if I didn't use it
+
 
 dictionary = PyDictionary()
 translator = Translator()
@@ -33,8 +32,6 @@ def save_user(message):
 	if not users.get(chat_id):
 		create_new_user()
 
-
-# HANDLERS
 
 def start(update, context):
 	"""The first message handler."""
@@ -72,7 +69,6 @@ def message(update, context):
 def send_random_card(context, chat_id):
 	"""Chooses a word with these rules:
 	as much ADDED as MORE chance
-	as much DOWN pressed as MORE chance
 	as much FLIPPED as MORE chance
 	as much SHOWN as LESS chance
 	as much UP pressed as LESS chance
@@ -80,7 +76,7 @@ def send_random_card(context, chat_id):
 
 	def send_card(context, chat_id, word):
 		card = users[chat_id]['cards'][word]
-		DEPRECATED_SEARCH(word, card)
+		research_word_attributes(word, card)
 		context.bot.send_message(
 			chat_id=chat_id,
 			text=generate_front_side(word, card),
@@ -92,7 +88,6 @@ def send_random_card(context, chat_id):
 	probabilities = []
 	for word, card in cards.items():
 		words_list.append(word)
-		# weight = (card['added'] + 1) * (card['down'] + 1) * (card['flipped'] + 1) / (card['shown'] + 1) / (card['up'] + 1)
 		weight = (card['added'] + 1) * (card['flipped'] + 1) / (card['shown'] + 1) / (card['up'] + 1)
 		probabilities.append(weight)
 	probabilities_sum = sum(probabilities)
@@ -103,10 +98,7 @@ def send_random_card(context, chat_id):
 	send_card(context, chat_id, chosen_word)
 
 
-
-def DEPRECATED_SEARCH(word, card):
-	###############
-	# Temporary ###
+def research_word_attributes(word, card):
 	if not card.get('definition'):
 		card['definition'] = get_definition(word)
 	if not card.get('pronunciation'):
@@ -172,7 +164,7 @@ def get_synonyms(word):
 
 
 def get_translation(word):
-	translation = translator.translate(word, src='en', dest='ru').text    # TODO: Add different languages ???
+	translation = translator.translate(word, src='en', dest='ru').text
 	translation = translation if translation != word else ''
 	return translation
 
@@ -192,7 +184,6 @@ def save_word(context, chat_id, new_word):
 			added=1,
 			shown=0,
 			up=0,
-			# down=0,
 			flipped=0,
 			definition=get_definition(new_word),
 			pronunciation=get_pronunciation(new_word),
@@ -200,7 +191,7 @@ def save_word(context, chat_id, new_word):
 			translation=get_translation(new_word)
 		)
 		cards[new_word] = new_card
-	DEPRECATED_SEARCH(new_word, new_card)
+	research_word_attributes(new_word, new_card)
 	utils.save_users(users)
 	pronunciation = new_card['pronunciation']
 	context.bot.send_message(
@@ -224,8 +215,6 @@ def inline_callback(update, context):
 	else:
 		if callback == 'delete':
 			delete_word(context, update, chat_id, message_text)
-		# elif callback == 'down':
-		# 	downgrade_word(context, chat_id, message_text)
 		elif callback == 'up':
 			upgrade_word(context, chat_id, message_text)
 			# Hide delete/up/edit buttons
@@ -271,13 +260,6 @@ def delete_word(context, update, chat_id, message_text):
 	utils.save_users(users)
 	update.callback_query.message.delete()
 	send_random_card(context, chat_id)
-
-
-# def downgrade_word(context, chat_id, message_text):
-# 	word = find_the_word(message_text)
-# 	users[chat_id]['cards'][word]['down'] += 1
-# 	utils.save_users(users)
-# 	send_random_card(context, chat_id)
 
 
 def upgrade_word(context, chat_id, message_text):

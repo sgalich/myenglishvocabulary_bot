@@ -5,6 +5,7 @@ downloads/
 history/
 data/
 .idea/
+.DS_Store/
 
 *.log
 *.jpg
