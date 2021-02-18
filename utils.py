@@ -2,6 +2,7 @@ import logging
 import json
 import os
 
+import telegram
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -11,7 +12,7 @@ from texts import texts
 USERS_FILE = os.path.join('.', 'data', 'users.json')
 
 
-def my_keyboard(text=texts['b_next']):
+def my_keyboard(text=texts['b_next']) -> ReplyKeyboardMarkup:
 	keyboard = ReplyKeyboardMarkup(
 		[
 			[
@@ -23,7 +24,7 @@ def my_keyboard(text=texts['b_next']):
 	return keyboard
 
 
-def inline_keyboard(mini=False):
+def inline_keyboard(mini=False) -> InlineKeyboardMarkup:
 	if mini:
 		return InlineKeyboardMarkup(
 			[[InlineKeyboardButton(text=texts['b_flip'], callback_data='flip')]],
@@ -42,12 +43,12 @@ def inline_keyboard(mini=False):
 	)
 
 
-def save_users(users):
+def save_users(users: dict) -> None:
 	with open(USERS_FILE, 'w+') as f:
 		f.write(json.dumps(users, indent=4))
 
 
-def clear(word: str):
+def clear(word: str) -> str:
 	"""Method clear string from bad symbols like double spaces, tabs, '\n' and '\r'."""
 	try:
 		word = word.replace('\n', '').replace('\t', ' ').replace('\r', '') \
@@ -67,9 +68,9 @@ def clear(word: str):
 	return word
 
 
-def get_saved_info():
+def get_saved_info() -> dict:
 
-	def get_users(file):
+	def get_users(file: str) -> dict:
 		users = {}
 		try:
 			with open(file, 'r') as f:
@@ -89,5 +90,5 @@ def get_saved_info():
 	return users
 
 
-def log(update):
+def log(update: telegram.Update) -> None:
 	logging.info(f'update: {update}')
