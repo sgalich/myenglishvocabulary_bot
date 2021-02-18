@@ -148,11 +148,13 @@ def get_definition(word: str) -> str:
 		definition += f'\n\n{part_of_speech}'
 		all_definitions_xpath = f'//h3[text()="{part_of_speech}"]/following-sibling::ul//li/text()'
 		all_definitions = response.xpath(all_definitions_xpath).getall()
+		all_definitions = [x.strip(', ').strip().replace('(', '', 1) \
+			[::-1].replace(')', '', 1)[::-1] for x in all_definitions]
+		# Shorten definitions
+		# Otherwise the message is too long: telegram.error.BadRequest: Message_too_long
+		all_definitions = [x for x in all_definitions if x][:3]
 		for definition_var in all_definitions:
-			definition_var = definition_var.strip(', ').strip().replace('(', '', 1)
-			definition_var = definition_var[::-1].replace(')', '', 1)[::-1]
-			if definition_var:
-				definition += f'\n\t– {definition_var}'
+			definition += f'\n\t– {definition_var}'
 	return definition
 
 
@@ -164,7 +166,7 @@ def get_pronunciation(word: str) -> str:
 def get_synonyms(word: str) -> str:
 	first_word = word.split()[0]  # Leave only 1st word
 	synonyms = dictionary.synonym(first_word)
-	synonyms = ', '.join(synonyms) if synonyms else ''
+	synonyms = ', '.join(synonyms[:10]) if synonyms else ''
 	return synonyms
 
 

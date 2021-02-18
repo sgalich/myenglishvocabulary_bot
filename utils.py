@@ -90,5 +90,5 @@ def get_saved_info() -> dict:
 	return users
 
 
-def log(update: telegram.Update) -> None:
-	logging.info(f'update: {update}')
+def log(text: str) -> None:
+	logging.info(f'update: {text}')
