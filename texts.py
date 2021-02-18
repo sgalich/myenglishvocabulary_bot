@@ -26,6 +26,5 @@ Good luck! 🤖""",
 	edit_pronunciation='Send a new pronunciation or leave this one:',
 	edit_definition='Send a new definition or leave this one:',
 	edit_synonyms='Send new synonyms or leave these:',
-	edit_translation='Send a new translation or leave this one:',
 	edit_finished='Done! Here is your new card:'
 )

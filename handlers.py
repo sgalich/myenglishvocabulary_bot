@@ -1,7 +1,8 @@
 import numpy
 from PyDictionary import PyDictionary
 import eng_to_ipa
-from googletrans import Translator
+import requests
+import scrapy
 
 from texts import texts
 import utils
@@ -11,7 +12,6 @@ import utils
 
 
 dictionary = PyDictionary()
-translator = Translator()
 users = {}
 
 
@@ -105,11 +105,10 @@ def research_word_attributes(word, card):
 		card['pronunciation'] = get_pronunciation(word)
 	if not card.get('synonyms'):
 		card['synonyms'] = get_synonyms(word)
-	if not card.get('translation'):
-		card['translation'] = get_translation(word)
 	utils.save_users(users)
 
 
+# TODO: Add examples
 def generate_front_side(word, card):
 	# Append get & shown notation
 	added = card['added']
@@ -128,26 +127,30 @@ def generate_front_side(word, card):
 def generate_back_side(word, card):
 	definition = card['definition']
 	synonyms = card['synonyms']
-	translation = card['translation']
 	back_side = f"""{definition}
 
 📖 {word}: {synonyms}
-
-🗣️ {translation}
 """
 	return back_side
 
 
-def get_definition(word):
+def get_definition(word: str) -> str:
 	"""Get definition of the word."""
 	first_word = word.split()[0]    # Leave only 1st word
-	meaning = dictionary.meaning(first_word)
+	url = f'http://wordnetweb.princeton.edu/perl/webwn?s={first_word}'
 	definition = ""
-	if meaning:
-		for part_of_speech, def_list in meaning.items():
-			definition += f'\n\n{part_of_speech}'
-			for dfntn in def_list:
-				definition += f'\n\t– {dfntn}'
+	response = requests.get(url).text
+	response = scrapy.selector.Selector(text=response)
+	parts_of_speech = response.xpath('//h3/text()').getall()
+	for part_of_speech in parts_of_speech:
+		definition += f'\n\n{part_of_speech}'
+		all_definitions_xpath = f'//h3[text()="{part_of_speech}"]/following-sibling::ul//li/text()'
+		all_definitions = response.xpath(all_definitions_xpath).getall()
+		for definition_var in all_definitions:
+			definition_var = definition_var.strip(', ').strip().replace('(', '', 1)
+			definition_var = definition_var[::-1].replace(')', '', 1)[::-1]
+			if definition_var:
+				definition += f'\n\t– {definition_var}'
 	return definition
 
 
@@ -161,12 +164,6 @@ def get_synonyms(word):
 	synonyms = dictionary.synonym(first_word)
 	synonyms = ', '.join(synonyms) if synonyms else ''
 	return synonyms
-
-
-def get_translation(word):
-	translation = translator.translate(word, src='en', dest='ru').text
-	translation = translation if translation != word else ''
-	return translation
 
 
 def save_word(context, chat_id, new_word):
@@ -187,8 +184,7 @@ def save_word(context, chat_id, new_word):
 			flipped=0,
 			definition=get_definition(new_word),
 			pronunciation=get_pronunciation(new_word),
-			synonyms=get_synonyms(new_word),
-			translation=get_translation(new_word)
+			synonyms=get_synonyms(new_word)
 		)
 		cards[new_word] = new_card
 	research_word_attributes(new_word, new_card)
@@ -319,19 +315,6 @@ def continue_edit_card(update, context, chat_id):
 			reply_markup=utils.my_keyboard(text=synonyms),
 		)
 	elif status == 'synonyms':
-		users[chat_id]['cards'][word]['synonyms'] = message_text
-		users[chat_id]['edit']['status'] = 'translation'
-		context.bot.send_message(
-			chat_id=chat_id,
-			text=texts['edit_translation']
-		)
-		translation = users[chat_id]['cards'][word]['translation']
-		context.bot.send_message(
-			chat_id=chat_id,
-			text=translation,
-			reply_markup=utils.my_keyboard(text=translation),
-		)
-	elif status == 'translation':
 		users[chat_id]['cards'][word]['synonyms'] = message_text
 		users[chat_id]['edit'] = None
 		utils.save_users(users)
