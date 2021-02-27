@@ -92,6 +92,13 @@ def send_random_card(context: CallbackContext, chat_id: int) -> None:
 		words_list.append(word)
 		weight = (card['added'] + 1) * (card['flipped'] + 1) / (card['shown'] + 1) / (card['up'] + 1)
 		probabilities.append(weight)
+	if not words_list:
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=texts['empty_vocabulary'],
+			reply_markup=utils.my_keyboard(''),
+		)
+		return None
 	probabilities_sum = sum(probabilities)
 	probabilities = [x / probabilities_sum for x in probabilities]
 	chosen_word = numpy.random.choice(words_list, p=probabilities)
