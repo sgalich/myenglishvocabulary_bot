@@ -5,11 +5,26 @@ import os
 import telegram
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import CallbackContext
 
 from texts import texts
 
 
 USERS_FILE = os.path.join('.', 'data', 'users.json')
+
+
+def send_message(context: CallbackContext, chat_id: int, text: str, reply_markup=None):
+	global users
+	try:
+		context.bot.send_message(
+			chat_id=chat_id,
+			text=text,
+			reply_markup=reply_markup,
+		)
+	except telegram.error.Unauthorized:
+		del users[context.job.context]
+		save_users()
+	# return users
 
 
 def my_keyboard(text=texts['b_next']) -> ReplyKeyboardMarkup:

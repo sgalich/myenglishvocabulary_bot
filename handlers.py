@@ -5,14 +5,16 @@ import requests
 import scrapy
 import telegram
 from telegram.ext import CallbackContext
+import datetime
+import pytz
 
 from texts import texts
 import utils
 
 
 # TODO: Send cards every day if I didn't use it
-
-
+DEFAULT_TIMEZONE = pytz.timezone('America/Los_Angeles')
+DATE_FORMAT = '%Y-%m-%d %H:%M'
 dictionary = PyDictionary()
 users = {}
 
@@ -58,7 +60,8 @@ def message(update: telegram.Update, context: CallbackContext) -> None:
 	message_text = update.message['text']
 
 	utils.log(f'>>> {chat_id}: {message_text}')
-
+	users[chat_id]['last_message'] = datetime.datetime.now().strftime(DATE_FORMAT)
+	utils.save_users(users)
 	if users[chat_id].get('edit'):
 		continue_edit_card(update, context, chat_id)
 	elif message_text == texts['b_next']:
@@ -66,6 +69,24 @@ def message(update: telegram.Update, context: CallbackContext) -> None:
 	else:
 		for word in message_text.split('\n'):
 			save_word(context, chat_id, word)
+	# Every day reminder
+	# job_queue.run_daily(everyday_reminder, 60, context=update.message.chat_id)
+	if not context.job_queue.jobs():
+		context.job_queue.run_daily(
+			everyday_reminder,
+			datetime.time(hour=23, minute=0, tzinfo=DEFAULT_TIMEZONE),
+			days=(0, 1, 2, 3, 4, 5, 6),
+			context=update.message.chat_id
+		)
+
+
+def everyday_reminder(context: CallbackContext) -> None:
+	# TODO: Fix the error:
+	# run time of job was missed by
+	chat_id = context.job.context
+	last_message = datetime.datetime.strptime(users[chat_id]['last_message'], DATE_FORMAT)
+	if (datetime.datetime.now() - last_message).days >= 1:
+		send_random_card(context, chat_id)
 
 
 def send_random_card(context: CallbackContext, chat_id: int) -> None:
@@ -79,11 +100,7 @@ def send_random_card(context: CallbackContext, chat_id: int) -> None:
 	def send_card(context: CallbackContext, chat_id: int, word: str) -> None:
 		card = users[chat_id]['cards'][word]
 		research_word_attributes(word, card)
-		context.bot.send_message(
-			chat_id=chat_id,
-			text=generate_front_side(word, card),
-			reply_markup=utils.inline_keyboard(),
-		)
+		utils.send_message(context, chat_id, generate_front_side(word, card), utils.inline_keyboard())
 
 	cards = users[chat_id]['cards']
 	words_list = []
@@ -242,7 +259,7 @@ def find_the_word(message_text: str) -> str:
 	if '👁️' in message_text:
 		word = message_text.split('\n')[0]
 	else:
-		word = message_text.split('📖 ')[1].split(': ')[0]
+		word = message_text.split('📖 ')[1].split(':')[0]
 	return word
 
 
@@ -282,16 +299,24 @@ def start_edit_card(context: CallbackContext, chat_id: int, message_text: str) -
 		'word': word,
 		'status': 'pronunciation'
 	}
-	context.bot.send_message(
-		chat_id=chat_id,
-		text=texts['edit_pronunciation']
-	)
+	utils.send_message(context, chat_id, texts['edit_pronunciation'])
 	pronunciation = users[chat_id]['cards'][word]['pronunciation']
-	context.bot.send_message(
-		chat_id=chat_id,
-		text=pronunciation,
-		reply_markup=utils.my_keyboard(text=pronunciation),
+	utils.send_message(
+		context, 
+		chat_id, 
+		pronunciation, 
+		utils.my_keyboard(text=pronunciation)
 	)
+	# context.bot.send_message(
+	# 	chat_id=chat_id,
+	# 	text=texts['edit_pronunciation']
+	# )
+	# pronunciation = users[chat_id]['cards'][word]['pronunciation']
+	# context.bot.send_message(
+	# 	chat_id=chat_id,
+	# 	text=pronunciation,
+	# 	reply_markup=utils.my_keyboard(text=pronunciation),
+	# )
 
 # TODO: Remake it with inline keyboard
 #  (choose what to edit after edit button is pressed and edit only one thing per try)

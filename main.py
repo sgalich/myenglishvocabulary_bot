@@ -19,7 +19,12 @@ def main():
 	updater = Updater(settings.API_KEY)
 	dispatcher = updater.dispatcher
 	dispatcher.add_handler(CommandHandler('start', handlers.start, pass_user_data=True))
-	dispatcher.add_handler(MessageHandler(Filters.text & (~Filters.command), handlers.message, pass_user_data=True))
+	dispatcher.add_handler(MessageHandler(
+		Filters.text & (~Filters.command),
+		handlers.message,
+		pass_user_data=True,
+		# pass_job_queue=True
+	))
 	dispatcher.add_handler(CallbackQueryHandler(handlers.inline_callback))
 	dispatcher.add_handler(CommandHandler('stop', handlers.stop))
 	updater.start_polling()
