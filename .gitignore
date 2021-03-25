@@ -2,7 +2,7 @@ env/
 __pycache__/
 #data/
 .idea/
-.DS_Store/
+*.DS_Store
 
 *.log
 *.jpg
