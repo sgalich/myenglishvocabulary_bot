@@ -2,8 +2,10 @@ env/
 __pycache__/
 .idea/
 *.DS_Store
+data/
 
 *.log
 *.jpg
+*.json
 
 settings.py
