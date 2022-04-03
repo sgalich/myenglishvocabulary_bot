@@ -7,5 +7,4 @@ data/
 *.log
 *.jpg
 *.json
-
-settings.py
+.env

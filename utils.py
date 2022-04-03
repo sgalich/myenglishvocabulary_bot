@@ -103,5 +103,6 @@ def get_saved_info() -> dict:
 	return users
 
 
-def log(text: str) -> None:
+def log(*args) -> None:
+	text = ' '.join(args)
 	logging.info(f'update: {text}')

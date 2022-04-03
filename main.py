@@ -1,11 +1,13 @@
 import logging
+import os
 
+from dotenv import load_dotenv
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler, Filters
 
-import settings
 import handlers
 import utils
 
+load_dotenv('.env')
 
 logging.basicConfig(
 	format='%(asctime)s - %(levelname)s - %(message)s',
@@ -16,14 +18,13 @@ logging.basicConfig(
 
 def main():
 	handlers.users = utils.get_saved_info()
-	updater = Updater(settings.API_KEY)
+	updater = Updater(os.environ['API_KEY'])
 	dispatcher = updater.dispatcher
 	dispatcher.add_handler(CommandHandler('start', handlers.start, pass_user_data=True))
 	dispatcher.add_handler(MessageHandler(
 		Filters.text & (~Filters.command),
 		handlers.message,
 		pass_user_data=True,
-		# pass_job_queue=True
 	))
 	dispatcher.add_handler(CallbackQueryHandler(handlers.inline_callback))
 	dispatcher.add_handler(CommandHandler('stop', handlers.stop))
