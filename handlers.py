@@ -1,16 +1,16 @@
-import numpy
-from PyDictionary import PyDictionary
+import datetime
+
 import eng_to_ipa
+import numpy
+import pytz
 import requests
 import scrapy
 import telegram
+from PyDictionary import PyDictionary
 from telegram.ext import CallbackContext
-import datetime
-import pytz
 
-from texts import texts
+import texts
 import utils
-
 
 # TODO: Send cards every day if I didn't use it
 DEFAULT_TIMEZONE = pytz.timezone('America/Los_Angeles')
@@ -40,9 +40,9 @@ def save_user(message: telegram.Message) -> None:
 def start(update: telegram.Update, context: CallbackContext) -> None:
 	"""The first message handler."""
 	save_user(update.message)
-	update.message.reply_text(texts['start'])
+	update.message.reply_text(texts.START)
 	update.message.reply_text(
-		texts['help'],
+		texts.HELP,
 		reply_markup=utils.my_keyboard()
 	)
 	user = users[update.message['chat']['id']]
@@ -64,7 +64,7 @@ def message(update: telegram.Update, context: CallbackContext) -> None:
 	utils.save_users(users)
 	if users[chat_id].get('edit'):
 		continue_edit_card(update, context, chat_id)
-	elif message_text == texts['b_next']:
+	elif message_text == texts.B_NEXT:
 		send_random_card(context, chat_id)
 	else:
 		for word in message_text.split('\n'):
@@ -112,7 +112,7 @@ def send_random_card(context: CallbackContext, chat_id: int) -> None:
 	if not words_list:
 		context.bot.send_message(
 			chat_id=chat_id,
-			text=texts['empty_vocabulary'],
+			text=texts.EMPTY_VOCABULARY,
 			reply_markup=utils.my_keyboard(''),
 		)
 		return None
@@ -299,7 +299,7 @@ def start_edit_card(context: CallbackContext, chat_id: int, message_text: str) -
 		'word': word,
 		'status': 'pronunciation'
 	}
-	utils.send_message(context, chat_id, texts['edit_pronunciation'])
+	utils.send_message(context, chat_id, texts.EDIT_PRONUNCIATION)
 	pronunciation = users[chat_id]['cards'][word]['pronunciation']
 	utils.send_message(
 		context, 
@@ -307,16 +307,7 @@ def start_edit_card(context: CallbackContext, chat_id: int, message_text: str) -
 		pronunciation, 
 		utils.my_keyboard(text=pronunciation)
 	)
-	# context.bot.send_message(
-	# 	chat_id=chat_id,
-	# 	text=texts['edit_pronunciation']
-	# )
-	# pronunciation = users[chat_id]['cards'][word]['pronunciation']
-	# context.bot.send_message(
-	# 	chat_id=chat_id,
-	# 	text=pronunciation,
-	# 	reply_markup=utils.my_keyboard(text=pronunciation),
-	# )
+
 
 # TODO: Remake it with inline keyboard
 #  (choose what to edit after edit button is pressed and edit only one thing per try)
@@ -329,7 +320,7 @@ def continue_edit_card(update: telegram.Update, context: CallbackContext, chat_i
 		users[chat_id]['edit']['status'] = 'definition'
 		context.bot.send_message(
 			chat_id=chat_id,
-			text=texts['edit_definition']
+			text=texts.EDIT_DEFINITION
 		)
 		definition = users[chat_id]['cards'][word]['definition']
 		context.bot.send_message(
@@ -342,7 +333,7 @@ def continue_edit_card(update: telegram.Update, context: CallbackContext, chat_i
 		users[chat_id]['edit']['status'] = 'synonyms'
 		context.bot.send_message(
 			chat_id=chat_id,
-			text=texts['edit_synonyms']
+			text=texts.EDIT_SYNONYMS
 		)
 		synonyms = users[chat_id]['cards'][word]['synonyms']
 		context.bot.send_message(
@@ -356,7 +347,7 @@ def continue_edit_card(update: telegram.Update, context: CallbackContext, chat_i
 		utils.save_users(users)
 		context.bot.send_message(
 			chat_id=chat_id,
-			text=texts['edit_finished'],
+			text=texts.EDIT_FINISHED,
 			reply_markup=utils.my_keyboard(),
 		)
 		context.bot.send_message(

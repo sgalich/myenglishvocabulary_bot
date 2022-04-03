@@ -1,14 +1,13 @@
-import logging
 import json
+import logging
 import os
 
 import telegram
-from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import CallbackContext
 
-from texts import texts
-
+import texts
 
 USERS_FILE = os.path.join('.', 'data', 'users.json')
 
@@ -23,11 +22,10 @@ def send_message(context: CallbackContext, chat_id: int, text: str, reply_markup
 		)
 	except telegram.error.Unauthorized:
 		del users[context.job.context]
-		save_users()
-	# return users
+		save_users(users)
 
 
-def my_keyboard(text=texts['b_next']) -> ReplyKeyboardMarkup:
+def my_keyboard(text=texts.B_NEXT) -> ReplyKeyboardMarkup:
 	keyboard = ReplyKeyboardMarkup(
 		[
 			[
@@ -42,16 +40,16 @@ def my_keyboard(text=texts['b_next']) -> ReplyKeyboardMarkup:
 def inline_keyboard(mini=False) -> InlineKeyboardMarkup:
 	if mini:
 		return InlineKeyboardMarkup(
-			[[InlineKeyboardButton(text=texts['b_flip'], callback_data='flip')]],
+			[[InlineKeyboardButton(text=texts.B_FLIP, callback_data='flip')]],
 			resize_keyboard=True
 		)
 	return InlineKeyboardMarkup(
 		[
-			[InlineKeyboardButton(text=texts['b_flip'], callback_data='flip')],
+			[InlineKeyboardButton(text=texts.B_FLIP, callback_data='flip')],
 			[
-				InlineKeyboardButton(text=texts['b_remove'], callback_data='delete'),
-				InlineKeyboardButton(text=texts['b_edit'], callback_data='edit'),
-				InlineKeyboardButton(text=texts['b_up'], callback_data='up'),
+				InlineKeyboardButton(text=texts.B_REMOVE, callback_data='delete'),
+				InlineKeyboardButton(text=texts.B_EDIT, callback_data='edit'),
+				InlineKeyboardButton(text=texts.B_UP, callback_data='up'),
 			]
 		],
 		resize_keyboard=True
