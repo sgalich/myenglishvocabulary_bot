@@ -13,6 +13,7 @@ cssselect==1.1.0
 eng-to-ipa==0.0.2
 futures==3.1.1
 goslate==1.5.1
+greenlet==1.1.2
 hyperlink==21.0.0
 idna==2.10
 incremental==21.3.0
@@ -20,6 +21,7 @@ itemadapter==0.2.0
 itemloaders==1.0.4
 jmespath==0.10.0
 lxml==4.6.3
+mysqlclient==2.1.0
 numpy==1.20.1
 pandas==1.2.3
 parsel==1.6.0
@@ -31,7 +33,7 @@ PyDictionary==2.0.1
 PyDispatcher==2.0.5
 pyOpenSSL==20.0.1
 python-dateutil==2.8.1
-python-dotenv~=0.20.0
+python-dotenv==0.20.0
 python-telegram-bot==13.4.1
 pytz==2021.1
 queuelib==1.5.0
@@ -40,6 +42,7 @@ Scrapy==2.4.1
 service-identity==18.1.0
 six==1.15.0
 soupsieve==2.2.1
+SQLAlchemy==1.4.35
 tornado==6.1
 Twisted==21.2.0
 tzlocal==2.1

@@ -1,28 +1,11 @@
-import json
-import logging
 import os
 
-import telegram
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram import ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import CallbackContext
 
 import texts
 
 USERS_FILE = os.path.join('.', 'data', 'users.json')
-
-
-def send_message(context: CallbackContext, chat_id: int, text: str, reply_markup=None):
-	global users
-	try:
-		context.bot.send_message(
-			chat_id=chat_id,
-			text=text,
-			reply_markup=reply_markup,
-		)
-	except telegram.error.Unauthorized:
-		del users[context.job.context]
-		save_users(users)
 
 
 def my_keyboard(text=texts.B_NEXT) -> ReplyKeyboardMarkup:
@@ -56,11 +39,6 @@ def inline_keyboard(mini=False) -> InlineKeyboardMarkup:
 	)
 
 
-def save_users(users: dict) -> None:
-	with open(USERS_FILE, 'w+') as f:
-		f.write(json.dumps(users, indent=4))
-
-
 def clear(word: str) -> str:
 	"""Method clear string from bad symbols like double spaces, tabs, '\n' and '\r'."""
 	try:
@@ -79,30 +57,3 @@ def clear(word: str) -> str:
 	except AttributeError:
 		pass
 	return word
-
-
-def get_saved_info() -> dict:
-
-	def get_users(file: str) -> dict:
-		users = {}
-		try:
-			with open(file, 'r') as f:
-				saved_users = json.loads(f.read())
-		except:
-			pass
-		else:
-			for chat_id, user in saved_users.items():
-				try:
-					chat_id = int(chat_id)
-				except ValueError:
-					pass
-				users[chat_id] = user
-		return users
-
-	users = get_users(USERS_FILE)
-	return users
-
-
-def log(*args) -> None:
-	text = ' '.join(args)
-	logging.info(f'update: {text}')
