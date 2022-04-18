@@ -14,6 +14,7 @@ import utils
 import vocabulary
 from db_api import DataBase, User, Card
 
+# TODO:  setup github actions + docker support
 # todo: Add translation. Ask user after start about language to translate
 
 load_dotenv('.env')
