@@ -39,10 +39,14 @@ def send_message(context: CallbackContext,
         DB.log(f'<<< {text}', user_id=chat_id, level='DEBUG')
     except telegram.error.Unauthorized:
         deactivate_user(chat_id)
+        DB.log(f'Bot was blocked by user', user_id=chat_id, level='DEBUG')
 
 
-def update_user(chat_id: int, username: str, language_code: str) -> User:
+def update_user(update: telegram.Update) -> User:
     """Save a new user or update last_message_datetime for a known user."""
+    chat_id = update.message['chat']['id']
+    username = update.message['chat']['username']
+    language_code = update.message.from_user['language_code']
     user = DB.select_one(User, id=chat_id)
     if user:
         DB.update(user, last_message_datetime=datetime.now(), is_active=True)
@@ -71,11 +75,7 @@ def message(update: telegram.Update, context: CallbackContext) -> None:
     chat_id = message['chat']['id']
     message_text = update.message['text']
     DB.log(f'>>> {message_text}', user_id=chat_id, level='DEBUG')
-    user = update_user(
-        chat_id=message['chat']['id'],
-        username=message['chat']['username'],
-        language_code=message.from_user['language_code']
-    )
+    user = update_user(update)
     # Reply
     if user.is_editing:
         continue_edit_card(update, context, user)
@@ -319,36 +319,37 @@ def continue_edit_card(update: telegram.Update,
 
 
 def start(update: telegram.Update, context: CallbackContext) -> None:
-    """The first message handler."""
-    message = update.message
-    update_user(
-        chat_id=message['chat']['id'],
-        username=message['chat']['username'],
-        language_code=message.from_user['language_code']
-    )
-    message.reply_text(texts.START)
+    """Handle the command /start."""
+    update_user(update)
+    # send_message(
+    #     context=context,
+    #     chat_id=update.message['chat']['id'],
+    #     text=texts.START
+    # )
+    update.message.reply_text(texts.START)
 
 
 def handle_stats(update: telegram.Update, context: CallbackContext) -> None:
-    message = update.message
-    user = update_user(
-        chat_id=message['chat']['id'],
-        username=message['chat']['username'],
-        language_code=message.from_user['language_code']
-    )
+    """Handle the command /stats."""
+    user = update_user(update)
     cards = DB.select_all(Card, user_id=user.id)
-    message.reply_text(texts.STATS.format(len(cards)))
+    send_message(
+        context=context,
+        chat_id=update.message['chat']['id'],
+        text=texts.STATS.format(len(cards)),
+        reply_markup=utils.inline_keyboard(),
+    )
 
 
 def help(update: telegram.Update, context: CallbackContext) -> None:
     """Handle the command /help."""
-    message = update.message
-    update_user(
-        chat_id=message['chat']['id'],
-        username=message['chat']['username'],
-        language_code=message.from_user['language_code']
+    update_user(update)
+    send_message(
+        context=context,
+        chat_id=update.message['chat']['id'],
+        text=texts.HELP,
+        reply_markup=utils.inline_keyboard(),
     )
-    message.reply_text(texts.HELP, reply_markup=utils.my_keyboard())
 
 
 def stop(update: telegram.Update, context: CallbackContext) -> None:
@@ -357,8 +358,8 @@ def stop(update: telegram.Update, context: CallbackContext) -> None:
     send_message(
         context=context,
         chat_id=chat_id,
-        text=texts.BYE,
-        # reply_markup=utils.my_keyboard(text='') # TODO: Hide reply inline Keyboard after /stop command
+        text=texts.BYE
+        # TODO: Hide reply inline Keyboard after /stop command
     )
     deactivate_user(chat_id)
 
@@ -369,7 +370,7 @@ def handle_error(update: telegram.Update, context: CallbackContext) -> None:
         chat_id = update.to_dict()['from']['id']
     except:
         chat_id = None
-    DB.log(context.error, level='ERROR', user_id=chat_id)
+    DB.log(str(context.error), level='ERROR', user_id=chat_id)
 
 
 def main():
