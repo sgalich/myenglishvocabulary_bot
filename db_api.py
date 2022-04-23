@@ -78,13 +78,19 @@ class DataBase(Handler):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
-        # 1. Initiate a session.
+        self.kwargs = kwargs
+        self.engine, self.connection, self.session = None, None, None
+        self._initiate_session(**kwargs)
+
+    def _initiate_session(self, **kwargs):
+        """Connect to the Data Base."""
         connect_timeout = kwargs.get('connect_timeout', self.CONNECT_TIMEOUT)
         self.engine = create_engine(
             self._make_connection_string(**kwargs),
             connect_args={'connect_timeout': connect_timeout}
         )
         self.connection = self.engine.connect()    # Verify db connection
+        self.engine.connect()
         self.session = sessionmaker(bind=self.engine, expire_on_commit=False)()
         # 2. Make our first entry in db after the connection established.
         self.log('DB connection established')
@@ -100,32 +106,39 @@ class DataBase(Handler):
         return connection_string
 
     def save(self, entity: Base) -> None:
+        self.engine.connect()
         self.session.add(entity)
         self.session.commit()
 
     def select_one(self, table: Type[Base], **kwargs):
+        self.engine.connect()
         try:
             return self.session.query(table).filter_by(**kwargs).first()
         except NoResultFound:
             return None
 
     def select_all(self, table: Type[Base], **kwargs):
+        self.engine.connect()
         return self.session.query(table).filter_by(**kwargs).all()
 
     def delete(self, table: Type[Base], **kwargs) -> None:
+        self.engine.connect()
         self.session.query(table).filter_by(**kwargs).delete()
         self.session.commit()
 
     def update(self, entity: Base, **kwargs) -> None:
+        self.engine.connect()
         for key, val in kwargs.items():
             setattr(entity, key, val)
         self.session.merge(entity)
         self.session.commit()
 
     def emit(self, record):
+        self.engine.connect()
         self.log(self.format(record), level=record.levelname)
 
     def log(self, *args, **kwargs) -> None:
+        self.engine.connect()
         message = ' '.join(args)
         self.session.add(LogMessage(message, **kwargs))
         self.session.commit()
