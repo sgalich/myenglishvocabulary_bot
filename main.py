@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, time
-
+import traceback
 import numpy
 import pytz
 import telegram
@@ -46,14 +46,15 @@ def update_user(update: telegram.Update) -> User:
     """Save a new user or update last_message_datetime for a known user."""
     chat_id = update.message['chat']['id']
     username = update.message['chat']['username']
-    language_code = update.message.from_user['language_code']
+    # language_code = update.message.from_user['language_code']
     user = DB.select_one(User, id=chat_id)
     if user:
         DB.update(user, last_message_datetime=datetime.now(), is_active=True)
     else:
-        user = User(id=chat_id, username=username, language_code=language_code)
+        user = User(id=chat_id, username=username) #, language_code=language_code)
         DB.save(user)
-        message = f'New user {username}, language: {language_code}'
+        message = (f'New user {username}, '
+                   f'language: {update.message.from_user["language_code"]}')
         DB.log(message, user_id=chat_id)
     return user
 
@@ -303,7 +304,7 @@ def continue_edit_card(update: telegram.Update,
             context=context,
             chat_id=chat_id,
             text=texts.EDIT_FINISHED,
-            reply_markup=utils.my_keyboard()
+            reply_markup=utils.my_keyboard(texts.B_NEXT)
         )
         send_message(
             context=context,
@@ -318,15 +319,25 @@ def continue_edit_card(update: telegram.Update,
         )
 
 
-def start(update: telegram.Update, context: CallbackContext) -> None:
+def handle_start(update: telegram.Update, context: CallbackContext) -> None:
     """Handle the command /start."""
-    update_user(update)
+    user = update_user(update)
+    language_code = (update.message.from_user['language_code']
+                     or texts.DEFAULT_LANGUAGE_CODE)
     # send_message(
     #     context=context,
     #     chat_id=update.message['chat']['id'],
     #     text=texts.START
     # )
-    update.message.reply_text(texts.START)
+    # update.message.reply_text(texts.START)
+    print(update.message.from_user['language_code'])
+    print(texts.get(language_code).START_1)
+    send_message(
+        context=context,
+        chat_id=update.message['chat']['id'],
+        text=texts.get(language_code).START_1,
+        reply_markup=utils.make_inline_keyboard_choose_language(language_code)
+    )
 
 
 def handle_stats(update: telegram.Update, context: CallbackContext) -> None:
@@ -370,17 +381,22 @@ def handle_error(update: telegram.Update, context: CallbackContext) -> None:
         chat_id = update.to_dict()['from']['id']
     except:
         chat_id = None
-    DB.log(str(context.error), level='ERROR', user_id=chat_id)
+    message = str(context.error) + '\n' + traceback.format_exc()
+    DB.log(message, level='ERROR', user_id=chat_id)
 
 
 def main():
-    """Start bot."""
+    """Start the bot."""
     updater = Updater(os.environ['API_KEY'])
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler('start', start, pass_user_data=True))
+    dispatcher.add_handler(CommandHandler(
+        command='start',
+        callback=handle_start,
+        pass_user_data=True
+    ))
     dispatcher.add_handler(MessageHandler(
-        Filters.text & (~Filters.command),
-        message,
+        filters=Filters.text & (~Filters.command),
+        callback=message,
         pass_user_data=True,
     ))
     dispatcher.add_handler(CallbackQueryHandler(inline_callback))

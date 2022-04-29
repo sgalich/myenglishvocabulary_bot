@@ -14,9 +14,13 @@ On the front side of each card you will see this info:
 📥 - how many times did you add this word
 👁️ - how many times have you seen this card before
 """
-START = f"""Hi there! I\'m a simple flash-card vocabulary bot for learning English words.
+START_1 = f"""Hi there! I\'m a simple flash-card vocabulary bot for learning English words.
 
-Just send me a word you want to add and I\'ll add it in your vocabulary. Then just learn your words by viewing random cards.
+Before we start please choose your language. I will translate English words you send me into this language 👇
+"""
+START_2 = f"""Okay, you are redy to go!
+
+Just send me a word you want tso add and I\'ll add it in your vocabulary. Then just learn your words by viewing random cards.
 
 {HELP}
 
@@ -28,6 +32,10 @@ B_FLIP = '↪️          FLIP OVER          ↩️'
 B_REMOVE = '🚫'
 B_UP = '👍'
 B_EDIT = '✍️'
+BUTTON_ENGLISH = '🇺🇸 No translation'
+BUTTON_RUSSIAN = '🇷🇺 Russian'
+BUTTON_ARABIC = '🇦🇪 Arabic'
+BUTTON_MALAY = '🇲🇾 Malay'
 EDIT_PRONUNCIATION = 'Send a new pronunciation or keep this 👇'
 EDIT_DEFINITION = 'Send a new definition or keep this 👇'
 EDIT_SYNONYMS = 'Send new synonyms or keep these 👇'
