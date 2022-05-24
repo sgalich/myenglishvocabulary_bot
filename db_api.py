@@ -73,6 +73,7 @@ class LogMessage(Base):
 
 class DataBase(Handler):
     CONNECT_TIMEOUT = 15
+    MAX_ATTEMPTS = 3
     DRIVER = 'mysql'
     DB_NAME = 'bot'
 
@@ -105,40 +106,52 @@ class DataBase(Handler):
                              f'{db_host}:{db_port}/{self.DB_NAME}')
         return connection_string
 
+    def _reconnect(self):
+        self.session.rollback()
+        self.engine.connect()
+
+    def _commit(self, attempt=1):
+        try:
+            self.session.commit()
+        except:
+            self.engine.connect()
+            if attempt <= self.MAX_ATTEMPTS:
+                self._commit(attempt + 1)
+
     def save(self, entity: Base) -> None:
         self.engine.connect()
         self.session.add(entity)
-        self.session.commit()
+        self._commit()
 
     def select_one(self, table: Type[Base], **kwargs):
-        self.engine.connect()
+        self._reconnect()
         try:
             return self.session.query(table).filter_by(**kwargs).first()
         except NoResultFound:
             return None
 
     def select_all(self, table: Type[Base], **kwargs):
-        self.engine.connect()
+        self._reconnect()
         return self.session.query(table).filter_by(**kwargs).all()
 
     def delete(self, table: Type[Base], **kwargs) -> None:
-        self.engine.connect()
+        self._reconnect()
         self.session.query(table).filter_by(**kwargs).delete()
-        self.session.commit()
+        self._commit()
 
     def update(self, entity: Base, **kwargs) -> None:
-        self.engine.connect()
+        self._reconnect()
         for key, val in kwargs.items():
             setattr(entity, key, val)
         self.session.merge(entity)
-        self.session.commit()
+        self._commit()
 
     def emit(self, record):
-        self.engine.connect()
+        self._reconnect()
         self.log(self.format(record), level=record.levelname)
 
     def log(self, *args, **kwargs) -> None:
-        self.engine.connect()
+        self._reconnect()
         message = ' '.join(args)
         self.session.add(LogMessage(message, **kwargs))
-        self.session.commit()
+        self._commit()
