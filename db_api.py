@@ -73,6 +73,7 @@ class LogMessage(Base):
 
 class DataBase(Handler):
     CONNECT_TIMEOUT = 15
+    MAX_ATTEMPTS = 3
     DRIVER = 'mysql'
     DB_NAME = 'bot'
 
@@ -109,10 +110,18 @@ class DataBase(Handler):
         self.session.rollback()
         self.engine.connect()
 
+    def _commit(self, attempt=1):
+        try:
+            self.session.commit()
+        except:
+            self.engine.connect()
+            if attempt <= self.MAX_ATTEMPTS:
+                self._commit(attempt + 1)
+
     def save(self, entity: Base) -> None:
         self.engine.connect()
         self.session.add(entity)
-        self.session.commit()
+        self._commit()
 
     def select_one(self, table: Type[Base], **kwargs):
         self._reconnect()
@@ -128,14 +137,14 @@ class DataBase(Handler):
     def delete(self, table: Type[Base], **kwargs) -> None:
         self._reconnect()
         self.session.query(table).filter_by(**kwargs).delete()
-        self.session.commit()
+        self._commit()
 
     def update(self, entity: Base, **kwargs) -> None:
         self._reconnect()
         for key, val in kwargs.items():
             setattr(entity, key, val)
         self.session.merge(entity)
-        self.session.commit()
+        self._commit()
 
     def emit(self, record):
         self._reconnect()
@@ -145,4 +154,4 @@ class DataBase(Handler):
         self._reconnect()
         message = ' '.join(args)
         self.session.add(LogMessage(message, **kwargs))
-        self.session.commit()
+        self._commit()
